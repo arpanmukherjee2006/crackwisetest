@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
-import { Clock, CheckCircle, XCircle, ArrowRight, ArrowLeft, TrendingDown, TrendingUp, AlertCircle } from 'lucide-react';
+import { Clock, CheckCircle, XCircle, ArrowRight, ArrowLeft, TrendingDown, TrendingUp, AlertCircle, Loader2 } from 'lucide-react';
 import { analyzeMistakes } from '@/lib/gemini';
 import { saveTestAttempt } from '@/lib/progress';
 
