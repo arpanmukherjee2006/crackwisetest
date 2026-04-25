@@ -76,11 +76,11 @@ async function generateWithGemini(prompt: string): Promise<string> {
   if (!response.ok) {
     const errorText = await response.text();
     console.error('Gemini API error:', errorText);
-    
+
     if (response.status === 429 || errorText.includes('quota')) {
       throw new Error('QUOTA_EXCEEDED');
     }
-    
+
     throw new Error('GEMINI_ERROR');
   }
 
@@ -92,7 +92,7 @@ async function generateWithGemini(prompt: string): Promise<string> {
 export async function generateContent(prompt: string, useGemini: boolean = false): Promise<string> {
   try {
     console.log(`Using ${useGemini ? 'Gemini' : 'Groq'} API...`);
-    
+
     if (useGemini) {
       return await generateWithGemini(prompt);
     } else {
@@ -100,7 +100,7 @@ export async function generateContent(prompt: string, useGemini: boolean = false
     }
   } catch (error: any) {
     console.error('Error calling AI API:', error);
-    
+
     // Fallback to other API if one fails
     if (error.message === 'GROQ_ERROR' && GEMINI_API_KEY) {
       console.log('Groq failed, trying Gemini as fallback...');
@@ -109,14 +109,14 @@ export async function generateContent(prompt: string, useGemini: boolean = false
       console.log('Gemini failed, trying Groq as fallback...');
       return await generateWithGroq(prompt);
     }
-    
+
     throw error;
   }
 }
 
 export async function generateMockTest(subject: string, topic: string, difficulty: string, numQuestions: number) {
   console.log('Generating mock test:', { subject, topic, difficulty, numQuestions });
-  
+
   // If more than 10 questions, split into smaller batches
   if (numQuestions > 10) {
     console.log('Splitting into batches for better reliability...');
@@ -124,20 +124,20 @@ export async function generateMockTest(subject: string, topic: string, difficult
     const batches = Math.ceil(numQuestions / batchSize);
     const allQuestions: any[] = [];
     const seenQuestions = new Set<string>(); // Track unique questions
-    
+
     for (let i = 0; i < batches; i++) {
       const questionsInBatch = Math.min(batchSize, numQuestions - (i * batchSize));
       console.log(`Generating batch ${i + 1}/${batches} with ${questionsInBatch} questions`);
-      
+
       // Add delay between batches to avoid rate limit (3 seconds)
       if (i > 0) {
         console.log('Waiting 3 seconds to avoid rate limit...');
         await new Promise(resolve => setTimeout(resolve, 3000));
       }
-      
+
       try {
         const batchQuestions = await generateQuestionBatch(subject, topic, difficulty, questionsInBatch);
-        
+
         // Filter out duplicate questions
         const uniqueQuestions = batchQuestions.filter((q: any) => {
           const questionKey = q.question.toLowerCase().trim();
@@ -148,14 +148,14 @@ export async function generateMockTest(subject: string, topic: string, difficult
           seenQuestions.add(questionKey);
           return true;
         });
-        
+
         allQuestions.push(...uniqueQuestions);
       } catch (error) {
         console.error(`Batch ${i + 1} failed, retrying once...`);
         // Retry once
         await new Promise(resolve => setTimeout(resolve, 2000));
         const batchQuestions = await generateQuestionBatch(subject, topic, difficulty, questionsInBatch);
-        
+
         // Filter duplicates on retry too
         const uniqueQuestions = batchQuestions.filter((q: any) => {
           const questionKey = q.question.toLowerCase().trim();
@@ -165,20 +165,20 @@ export async function generateMockTest(subject: string, topic: string, difficult
           seenQuestions.add(questionKey);
           return true;
         });
-        
+
         allQuestions.push(...uniqueQuestions);
       }
     }
-    
+
     console.log('Successfully generated', allQuestions.length, 'unique questions in batches');
-    
+
     // If we got fewer questions due to duplicates, generate more
     if (allQuestions.length < numQuestions) {
       const remaining = numQuestions - allQuestions.length;
       console.log(`Need ${remaining} more questions to reach target`);
       await new Promise(resolve => setTimeout(resolve, 3000));
       const extraQuestions = await generateQuestionBatch(subject, topic, difficulty, remaining);
-      
+
       const uniqueExtra = extraQuestions.filter((q: any) => {
         const questionKey = q.question.toLowerCase().trim();
         if (seenQuestions.has(questionKey)) {
@@ -187,13 +187,13 @@ export async function generateMockTest(subject: string, topic: string, difficult
         seenQuestions.add(questionKey);
         return true;
       });
-      
+
       allQuestions.push(...uniqueExtra);
     }
-    
+
     return allQuestions;
   }
-  
+
   // For 10 or fewer questions, generate in one go
   return await generateQuestionBatch(subject, topic, difficulty, numQuestions);
 }
@@ -209,7 +209,7 @@ async function generateQuestionBatch(subject: string, topic: string, difficulty:
   } else {
     difficultyPrompt = `Generate all questions at ${difficulty} difficulty level for JEE/NEET competitive exams.`;
   }
-  
+
   const prompt = `You are an expert JEE/NEET question paper setter. Generate EXACTLY ${numQuestions} UNIQUE multiple choice questions for ${subject} - ${topic}.
 
 IMPORTANT REQUIREMENTS:
@@ -267,25 +267,25 @@ Generate ${numQuestions} COMPLETELY UNIQUE questions now. Return ONLY the JSON a
     const response = await generateContent(prompt, true); // Use Gemini for tests
     console.log('Got response, length:', response.length);
     console.log('Response preview:', response.substring(0, 300));
-    
+
     // Extract JSON from response (handle markdown code blocks and extra text)
     let jsonStr = response.trim();
-    
+
     // Remove markdown code blocks if present
     jsonStr = jsonStr.replace(/```json\n?/gi, '').replace(/```\n?/g, '');
-    
+
     // Remove any text before the first [
     const startIndex = jsonStr.indexOf('[');
     if (startIndex > 0) {
       jsonStr = jsonStr.substring(startIndex);
     }
-    
+
     // Remove any text after the last ]
     const endIndex = jsonStr.lastIndexOf(']');
     if (endIndex > 0 && endIndex < jsonStr.length - 1) {
       jsonStr = jsonStr.substring(0, endIndex + 1);
     }
-    
+
     // Fix common JSON issues
     jsonStr = jsonStr
       .replace(/\n/g, ' ')  // Remove newlines
@@ -293,47 +293,47 @@ Generate ${numQuestions} COMPLETELY UNIQUE questions now. Return ONLY the JSON a
       .replace(/\t/g, ' ')  // Replace tabs with spaces
       .replace(/\s+/g, ' ') // Normalize whitespace
       .trim();
-    
+
     console.log('Cleaned response preview:', jsonStr.substring(0, 300));
-    
+
     // Try to parse JSON
     try {
       const questions = JSON.parse(jsonStr);
-      
+
       if (!Array.isArray(questions)) {
         console.error('Response is not an array:', typeof questions);
         throw new Error('Response is not an array');
       }
-      
+
       if (questions.length === 0) {
         throw new Error('No questions generated');
       }
-      
+
       // Validate question structure
-      const validQuestions = questions.filter(q => 
-        q.question && 
-        q.options && 
-        q.correctAnswer && 
+      const validQuestions = questions.filter(q =>
+        q.question &&
+        q.options &&
+        q.correctAnswer &&
         q.explanation
       );
-      
+
       if (validQuestions.length === 0) {
         throw new Error('No valid questions found in response');
       }
-      
+
       console.log('Successfully parsed', validQuestions.length, 'valid questions');
       return validQuestions;
     } catch (parseError: any) {
       console.error('JSON parse error:', parseError.message);
       console.error('Failed to parse JSON. First 500 chars:', jsonStr.substring(0, 500));
-      
+
       // Try to extract and log the problematic part
       const errorMatch = parseError.message.match(/position (\d+)/);
       if (errorMatch) {
         const pos = parseInt(errorMatch[1]);
         console.error('Error near:', jsonStr.substring(Math.max(0, pos - 50), pos + 50));
       }
-      
+
       throw new Error('AI returned invalid JSON format. Please try again with fewer questions or a different topic.');
     }
   } catch (error: any) {
@@ -343,7 +343,7 @@ Generate ${numQuestions} COMPLETELY UNIQUE questions now. Return ONLY the JSON a
 }
 
 export async function getStudyHelp(question: string, context?: string) {
-  const prompt = context 
+  const prompt = context
     ? `Context: ${context}\n\nStudent Question: ${question}\n\nProvide a clear, exam-focused answer with step-by-step explanations. Use plain text for formulas.`
     : `Student Question: ${question}\n\nProvide a clear, exam-focused answer with step-by-step explanations. Use plain text for formulas.`;
 
@@ -357,7 +357,7 @@ export async function explainConcept(concept: string, subject: string) {
 }
 
 export async function analyzeMistakes(incorrectQuestions: any[]) {
-  const questionsText = incorrectQuestions.map((q, i) => 
+  const questionsText = incorrectQuestions.map((q, i) =>
     `${i + 1}. ${q.question}\nYour answer: ${q.userAnswer}\nCorrect answer: ${q.correctAnswer}`
   ).join('\n\n');
 
